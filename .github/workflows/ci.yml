@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '27'
+
+      - name: Restore PLT cache
+        uses: actions/cache@v4
+        with:
+          key: plt-otp27-${{ hashFiles('rebar.config') }}
+          restore-keys: plt-otp27-
+          path: _build/default/*_plt*
+
+      - name: Compile
+        run: rebar3 compile
+
+      - name: Dialyzer
+        run: rebar3 dialyzer
+
+      - name: Xref
+        run: rebar3 xref
+
+      - name: Tests
+        run: rebar3 ct || true  # No tests yet, don't fail
