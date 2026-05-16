@@ -69,8 +69,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check for C sources
+        id: c_check
+        run: |
+          if find c_src -name '*.c' -o -name '*.h' 2>/dev/null | grep -q .; then
+            echo "has_c=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_c=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check C formatting
-        if: hashFiles('c_src/*.c', 'c_src/*.h') != ''
+        if: steps.c_check.outputs.has_c == 'true'
         run: |
           sudo apt-get install -y clang-format-15
           find c_src -name '*.c' -o -name '*.h' | xargs clang-format-15 --dry-run --Werror
@@ -78,32 +87,44 @@ jobs:
   asan:
     name: AddressSanitizer
     runs-on: ubuntu-latest
-    if: hashFiles('c_src/*.c') != ''
     needs: check
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      - name: Check for C sources
+        id: c_check
+        run: |
+          if find c_src -name '*.c' 2>/dev/null | grep -q .; then
+            echo "has_c=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_c=false" >> "$GITHUB_OUTPUT"
+            echo "No C sources, skipping ASAN"
+          fi
+
       - uses: erlef/setup-beam@v1
+        if: steps.c_check.outputs.has_c == 'true'
         with:
           otp-version: '27'
           rebar3-version: '3.24'
 
       - name: Compile NIF with ASAN
+        if: steps.c_check.outputs.has_c == 'true'
         env:
           CFLAGS: "-fsanitize=address -fno-omit-frame-pointer -fno-common -g"
           LDFLAGS: "-fsanitize=address"
         run: rebar3 compile
 
       - name: Run tests under ASAN
+        if: steps.c_check.outputs.has_c == 'true'
         env:
           ASAN_OPTIONS: "halt_on_error=true:detect_leaks=1:log_path=/tmp/asan"
           LSAN_OPTIONS: "suppressions=asan_suppressions.txt"
         run: rebar3 ct --verbose || true
 
       - name: Check for ASAN reports
-        if: always()
+        if: steps.c_check.outputs.has_c == 'true'
         run: |
           if ls /tmp/asan.* 1>/dev/null 2>&1; then
             echo "::error::AddressSanitizer found issues:"
@@ -116,27 +137,40 @@ jobs:
   valgrind:
     name: Valgrind
     runs-on: ubuntu-latest
-    if: hashFiles('c_src/*.c') != ''
     needs: check
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      - name: Check for C sources
+        id: c_check
+        run: |
+          if find c_src -name '*.c' 2>/dev/null | grep -q .; then
+            echo "has_c=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_c=false" >> "$GITHUB_OUTPUT"
+            echo "No C sources, skipping Valgrind"
+          fi
+
       - uses: erlef/setup-beam@v1
+        if: steps.c_check.outputs.has_c == 'true'
         with:
           otp-version: '27'
           rebar3-version: '3.24'
 
       - name: Install Valgrind
+        if: steps.c_check.outputs.has_c == 'true'
         run: sudo apt-get install -y valgrind
 
       - name: Compile with debug info
+        if: steps.c_check.outputs.has_c == 'true'
         env:
           CFLAGS: "-g -O0"
         run: rebar3 compile
 
       - name: Run tests under Valgrind
+        if: steps.c_check.outputs.has_c == 'true'
         run: |
           valgrind --leak-check=full \
                    --show-leak-kinds=all \
@@ -147,7 +181,7 @@ jobs:
                    rebar3 ct --verbose || true
 
       - name: Check Valgrind report
-        if: always()
+        if: steps.c_check.outputs.has_c == 'true'
         run: |
           if [ -f /tmp/valgrind.log ]; then
             if grep -q "ERROR SUMMARY: 0 errors" /tmp/valgrind.log; then
