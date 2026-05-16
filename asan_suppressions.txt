@@ -1,0 +1,8 @@
+# AddressSanitizer suppressions for quiche_erl
+#
+# Add entries here for known false positives from the Erlang runtime
+# or third-party libraries. Format:
+#   leak:function_name
+#   leak:library_name
+#
+# See: https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer#suppressions

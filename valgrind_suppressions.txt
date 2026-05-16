@@ -1,0 +1,11 @@
+# Valgrind suppressions for quiche_erl
+#
+# Add entries here for known false positives from the Erlang runtime
+# or third-party libraries. Format:
+#   {
+#     <suppression_name>
+#     Memcheck:Leak
+#     fun:function_name
+#   }
+#
+# See: https://valgrind.org/docs/manual/mc-manual.html#mc-manual.suppfiles
